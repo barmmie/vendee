@@ -1,0 +1,82 @@
+version: '3'
+
+networks:
+    vendee:
+
+services:
+    app:
+        build:
+            context: ./dockerfiles
+            dockerfile: nginx.dockerfile
+            args:
+                - UID=${UID:-1000}
+                - GID=${GID:-1000}
+        ports:
+            - "8080:80"
+        volumes:
+            - ./src:/var/www/html:delegated
+        depends_on:
+            - php
+            - mysql
+        networks:
+            - vendee
+
+    mysql:
+        image: mariadb:10.6
+        restart: unless-stopped
+        tty: true
+        ports:
+            - "33306:3306"
+        environment:
+            MYSQL_DATABASE: vendee
+            MYSQL_USER: vendee
+            MYSQL_PASSWORD: secret
+            MYSQL_ROOT_PASSWORD: secret
+            SERVICE_TAGS: dev
+            SERVICE_NAME: mysql
+        networks:
+            - vendee
+
+    php:
+        build:
+            context: ./dockerfiles
+            dockerfile: php.dockerfile
+            args:
+                - UID=${UID:-1000}
+                - GID=${GID:-1000}
+        ports:
+            - "9090:9000"
+        volumes:
+            - ./src:/var/www/html:delegated
+        networks:
+            - vendee
+
+    composer:
+        build:
+            context: ./dockerfiles
+            dockerfile: php.dockerfile
+            args:
+                - UID=${UID:-1000}
+                - GID=${GID:-1000}
+        volumes:
+            - ./src:/var/www/html
+        depends_on:
+            - php
+        entrypoint: [ 'composer', '--ignore-platform-reqs' ]
+        networks:
+            - vendee
+
+    artisan:
+        build:
+            context: ./dockerfiles
+            dockerfile: php.dockerfile
+            args:
+                - UID=${UID:-1000}
+                - GID=${GID:-1000}
+        volumes:
+            - ./src:/var/www/html:delegated
+        depends_on:
+            - mysql
+        entrypoint: [ 'php', '/var/www/html/artisan' ]
+        networks:
+            - vendee
